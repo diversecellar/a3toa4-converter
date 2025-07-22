@@ -10,35 +10,58 @@ import sys
 import os
 import glob
 import pymupdf
+import pypdf
+from pypdf import PdfReader, PdfWriter, PaperSize
 from pathlib import Path
+from tkinter import Tk, Button, filedialog, simpledialog
 
+# Stuff that is standard in all my codes (where is .py located essentially)
 fixed_code_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(fixed_code_path)
 
-from tkinter import Tk
-from tkinter import Button
-from tkinter import filedialog
+# Create a Tkinter root window, but hide it as it's not needed for filedialog
 root = Tk()
 # root.withdraw()
-filename = filedialog.askdirectory(title="Select Folder With A3 Scans")
+# Prompt the user for input using the file explorer to select folder
+src_docs_foldername = filedialog.askdirectory(title="Select Folder With A3 Scans")
 # def open():
 
 #     print(filename)
 # button = Button(root, text="Open A3 Scans Folder", command=open)
 # button.pack()
-root.destroy()
-code_path = os.path.join(filename)
-code_path = Path(code_path).as_posix()
-os.chdir(code_path)
-scans_dir = os.getcwd()
-output_folder_name = str(os.path.basename(code_path)) + " - A4 Outputs"
-parent_dir = os.path.dirname(code_path)
-list_of_files = glob.glob("*.pdf", recursive=False)
-os.chdir(code_path)
+root.destroy() # destroy the TK root window
+
+# Code to store data about the directory containg the source files
+src_docs_path = os.path.join(src_docs_foldername) # force parse as path
+src_docs_path = Path(src_docs_path).as_posix() # force parse as path in the current OS
+os.chdir(src_docs_path) # change to the directory with the source files
+scans_dir = os.getcwd() # redudant but perhaps useful
+output_folder_name = str(os.path.basename(src_docs_path)) + " - A4 Outputs" # store name of outputs folder directory
+parent_dir = os.path.dirname(src_docs_path) # name of parent to src_docs_path
+list_of_files = glob.glob("*.pdf", recursive=False) # list of A3 target documents
+os.chdir(src_docs_path) # change to the directory with the source files
 
 print("-----------------------------------------------------")
 print("START: processing scans! - from {} for inputs".format(scans_dir))
 print("-----------------A3 to A4 Converter------------------")
+
+# Create a Tkinter root window, but hide it as it's not needed for simpledialog
+root_2 = Tk()
+root_2.withdraw()
+# Prompt the user for input using a dialog box
+user_input = simpledialog.askstring(title="User Input",
+                                    prompt="Please specify whech side of the A3 page is the first page of your output document (L or R):")
+user_input = str(user_input) # force string
+
+# Check if the user entered something or clicked Cancel
+if user_input is not None:
+    if user_input.lower()[:1] == "l": # if user puts in "left", "LeFT" or "l" will be  a positive catch
+        print("PROCESS: left-side (in landscape) is first page")
+    else:
+        print("PROCESS: right-side (in landscape) is first page")
+else:
+    print("END: User cancelled the input or entered no input.")
+    sys.exit() # exit function to stop the run
 
 def a3_to_two_a4(input_pdf_path, output_pdf_path):
     """
@@ -48,65 +71,124 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
         input_pdf_path (str): Path to the input A3 PDF file.
         output_pdf_path (str): Path to save the output PDF file with A4 pages.
     """
-    os.chdir(code_path)
-    doc = pymupdf.open(input_pdf_path)
-    new_doc = pymupdf.open()
+    os.chdir(src_docs_path) # change to the directory with the source files
+    doc = PdfReader(input_pdf_path)
+    writer = PdfWriter()
 
-    a3_width, a3_height = pymupdf.paper_size("a3-L") # Get A3 dimensions in points
-    a4_width, a4_height = pymupdf.paper_size("a4") # Get A4 dimensions in points
+    a4_width = PaperSize.A4.width
+    a4_height = PaperSize.A4.height
 
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        page_width = page.rect.width
-        page_height = page.rect.height
+    for page_num, page in enumerate(doc.pages):
+        # Ensure the page is A3 landscape (approximate check)
+        # A3 landscape dimensions: ~1191 x 842 points (72 dpi)
+        # A4 portrait dimensions: ~595 x 842 points (72 dpi)
+        # So A3 landscape is essentially (2 * A4_width) x A4_height
 
-        # Calculate the split point for A4 pages
-        split_x = page_width / 2
-        # Create the left A4 page
-        rect_left = pymupdf.Rect(0, split_x, page_height, page_width)
-        while page.number != 0:
-            new_page_left = new_doc.new_page(width=page_height, height=split_x)
-            new_page_left.show_pdf_page(new_page_left.rect, doc, page.number, clip=rect_left)
-            new_page_left.set_rotation(90)
-            break
-        # Create the right A4 page
-        rect_right = pymupdf.Rect(0, 0, page_height, split_x)
-        new_page_right = new_doc.new_page(width=page_height, height=split_x)
-        new_page_right.show_pdf_page(new_page_right.rect, doc, page.number, clip=rect_right)
-        new_page_right.set_rotation(90)
-        #new_page_left.draw_rect(rect_left, color=(1, 0, 0), fill=(0, 0, 1), width=2)
+        rotated_angle = page.rotation
+        page_width = float(page.mediabox.height)
+        page_height = float(page.mediabox.width)
 
-        # # Create the right A4 page
-        # rect_right = pymupdf.Rect(split_x, 0, page_width, page_height)
-        # new_page_right = new_doc.new_page(width=split_x, height=page_height)
-        # new_page_right.show_pdf_page(new_page_right.rect, doc, page.number, clip=rect_right)
+        if rotated_angle in [0, 180]:
+            if str(user_input).lower() == "r":
+                while page_num >= 1:
+                    # Create the first A4 page (left half of the A3)
+                    left_half = writer.add_blank_page(width=a4_width, height=a4_height)
+                    # Set the crop box to the left half of the A3 page
+                    left_half.mediabox.lower_left = (0, 0)
+                    left_half.mediabox.upper_right = (page_width / 2, page_height)
 
-        # # Revert page rotation if it was changed
-        # if page.rotation in {90, 270} and (a3_width, a3_height) != (temp_width, temp_height):
-        #     page.set_rotation(0) # Revert rotation
+                    # Add the content of the original page to the new A4 page
+                    # The .add_transformation() is crucial for positioning the content correctly
+                    left_half.add_transformation((1, 0, 0, 1, 0, 0)) # No transformation for the left half
+                    left_half.merge_page(page)
+                    left_half.rotate(rotated_angle)
+                    break
+            else:
+                # Create the first A4 page (left half of the A3)
+                left_half = writer.add_blank_page(width=a4_width, height=a4_height)
+                # Set the crop box to the left half of the A3 page
+                left_half.mediabox.lower_left = (0, 0)
+                left_half.mediabox.upper_right = (page_width / 2, page_height)
+
+                # Add the content of the original page to the new A4 page
+                # The .add_transformation() is crucial for positioning the content correctly
+                left_half.add_transformation((1, 0, 0, 1, 0, 0)) # No transformation for the left half
+                left_half.merge_page(page)
+                left_half.rotate(rotated_angle)
+
+            # Create the second A4 page (right half of the A3)
+            right_half = writer.add_blank_page(width=a4_width, height=a4_height)
+            # Set the crop box to the right half of the A3 page
+            right_half.mediabox.lower_left = (page_width / 2, 0)
+            right_half.mediabox.upper_right = (page_width, page_height)
+
+            # Translate the content of the original page to fit the right A4 page
+            # We shift the content left by half the A3 width
+            right_half.add_transformation((1, 0, 0, 1, -page_width / 2, 0))
+            right_half.merge_page(page)
+            right_half.rotate(rotated_angle)
+
+        else:
+            if str(user_input).lower() == "r":
+                while page_num >= 1:
+                    # Create the first A4 page (left half of the A3)
+                    left_half = writer.add_blank_page(width=a4_width, height=a4_height)
+                    # Set the crop box to the left half of the A3 page
+                    left_half.mediabox.lower_left = (0, 0)
+                    left_half.mediabox.upper_right = (page_height, page_width / 2)
+
+                    # Add the content of the original page to the new A4 page
+                    # The .add_transformation() is crucial for positioning the content correctly
+                    left_half.add_transformation((1, 0, 0, 1, 0, 0)) # No transformation for the left half
+                    left_half.merge_page(page)
+                    left_half.rotate(rotated_angle)
+                    break
+            else:
+                # Create the first A4 page (left half of the A3)
+                left_half = writer.add_blank_page(width=a4_width, height=a4_height)
+                # Set the crop box to the left half of the A3 page
+                left_half.mediabox.lower_left = (0, 0)
+                left_half.mediabox.upper_right = (page_height, page_width / 2)
+
+                # Add the content of the original page to the new A4 page
+                # The .add_transformation() is crucial for positioning the content correctly
+                left_half.add_transformation((1, 0, 0, 1, 0, 0)) # No transformation for the left half
+                left_half.merge_page(page)
+                left_half.rotate(rotated_angle)
+
+            # Create the second A4 page (right half of the A3)
+            right_half = writer.add_blank_page(width=a4_width, height=a4_height)
+            # Set the crop box to the right half of the A3 page
+            right_half.mediabox.lower_left = (0, page_width / 2)
+            right_half.mediabox.upper_right = (page_height, page_width)
+
+            # Translate the content of the original page to fit the right A4 page
+            # We shift the content left by half the A3 width
+            right_half.add_transformation((1, 0, 0, 1, -page_height / 2, 0))
+            right_half.merge_page(page)
+            right_half.rotate(rotated_angle)
 
     if not os.path.exists(output_folder_name):
         os.mkdir(output_folder_name)
     os.chdir(output_folder_name)
-    new_doc.save(output_pdf_path)
-    new_doc.close()
-    doc.close()
-    os.chdir(code_path)
+    with open(output_pdf_path, "wb") as output_stream:
+        writer.write(output_stream)
+    os.chdir(src_docs_path) # change back to the directory with the source files
 
-# usage:
+# Usage:
+output_dir = os.path.join(src_docs_path, output_folder_name) # parse as path the output folder directory
+output_dir = Path(output_dir).as_posix() # force parse as path in the current OS
 
-
-outs_dir = os.path.join(code_path, output_folder_name)
-outs_dir = Path(outs_dir).as_posix()
+# loops over all files in the list of A3 target source documents
 for file in list_of_files:
-    scans = os.path.join(code_path, file)
-    scans = Path(code_path).as_posix()
-    outs = os.path.join(outs_dir, file)
-    print("PROCESS: processing a3 file", scans)
+    src_scan_file = os.path.join(src_docs_path, file) # parse as path the source file
+    src_scan_file = Path(src_scan_file).as_posix() # force parse as path in the current OS
+    output_pdf_file = os.path.join(output_dir, file) # parse as path the output file
+    print("PROCESS: processing a3 file", src_scan_file)
     a3_to_two_a4("{}".format(file), "{}".format(file))
     #print("END: done converting a3 file to a4:", outs)
 print("-----------------------------------------------------")
-print("DONE: finished processing scans - check {} for outputs".format(outs_dir))
-print("END: now opening output folder {} in windows file explorer".format(outs_dir))
-os.startfile(outs_dir)
+print("DONE: finished processing scans - check {} for outputs".format(output_dir))
+print("END: now opening output folder {} in windows file explorer".format(output_dir))
+os.startfile(output_dir)
 print("-----------------------------------------------------")
