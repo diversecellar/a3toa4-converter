@@ -1,7 +1,13 @@
 README
 
+BUILD
+1) open powershell terminal in the home directory of this app
+2) run "powershell.exe .\ps-base\macro.ps1" in the shell
+
 INSTALLATION:
-1) You must click the installer and when it prompts for admin privileges, say "Yes"
+1a) If windows python
+already exists, the app will use it automatically
+1b) If not, you must click the installer and when it prompts for admin privileges, say "Yes"
 2) Installation is quick and takes about 3-5 minutes
 
 USAGE:
