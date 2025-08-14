@@ -1,5 +1,10 @@
 README
 
+PURPOSE
+This little app, built i the PowerShell 7.5+ and Python 3.9+ languages (w/ versions), was built to aid my department at my university (redacted) in scanning exam scripts and processing them for storage and provision of external moderation. Usually, one would scan each page of a double-paged booklet (i.e. page on left then page on right) sequentially and individually. This can easily take 3 hours for just 20 scripts. Then, each file then has to be processed individually.
+
+Now, with this app, you can scan the booklet as-is, in A3 form (page by page), saving 60% of scanning time and then, at the click of a button it converts all the A3s into A4s. Thus saving time lost to painful admin tasks.
+
 BUILD
 1) open powershell terminal in the home directory of this app
 2) run "powershell.exe .\ps-base\macro.ps1" in the shell
