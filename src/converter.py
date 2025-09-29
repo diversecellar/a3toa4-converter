@@ -5,6 +5,9 @@ Created on Fri Jul 18 10:02:24 2025
 @author: Paul Namalomba
 """
 
+# =====================================================================================
+# IMPORTS AND DEPENDENCIES
+# =====================================================================================
 import subprocess
 import sys
 import os
@@ -15,10 +18,18 @@ from pypdf import PdfReader, PdfWriter, PaperSize
 from pathlib import Path
 from tkinter import Tk, Button, filedialog, simpledialog
 
+
+# =====================================================================================
+# INITIAL SETUP AND WORKING DIRECTORY CONFIGURATION
+# =====================================================================================
 # Stuff that is standard in all my codes (where is .py located essentially)
 fixed_code_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(fixed_code_path)
 
+
+# =====================================================================================
+# USER INPUT: SOURCE FOLDER SELECTION
+# =====================================================================================
 # Create a Tkinter root window, but hide it as it's not needed for filedialog
 root = Tk()
 # root.withdraw()
@@ -31,6 +42,10 @@ src_docs_foldername = filedialog.askdirectory(title="Select Folder With A3 Scans
 # button.pack()
 root.destroy() # destroy the TK root window
 
+
+# =====================================================================================
+# DIRECTORY PROCESSING AND FILE DISCOVERY
+# =====================================================================================
 # Code to store data about the directory containg the source files
 src_docs_path = os.path.join(src_docs_foldername) # force parse as path
 src_docs_path = Path(src_docs_path).as_posix() # force parse as path in the current OS
@@ -41,10 +56,18 @@ parent_dir = os.path.dirname(src_docs_path) # name of parent to src_docs_path
 list_of_files = glob.glob("*.pdf", recursive=False) # list of A3 target documents
 os.chdir(src_docs_path) # change to the directory with the source files
 
+
+# =====================================================================================
+# APPLICATION STATUS DISPLAY
+# =====================================================================================
 print("-----------------------------------------------------")
 print("START: processing scans! - from {} for inputs".format(scans_dir))
 print("-----------------A3 to A4 Converter------------------")
 
+
+# =====================================================================================
+# USER INPUT: PAGE ORDER CONFIGURATION
+# =====================================================================================
 # Create a Tkinter root window, but hide it as it's not needed for simpledialog
 root_2 = Tk()
 root_2.withdraw()
@@ -53,6 +76,10 @@ user_input = simpledialog.askstring(title="User Input",
                                     prompt="Please specify whech side of the A3 page is the first page of your output document (L or R):")
 user_input = str(user_input) # force string
 
+
+# =====================================================================================
+# INPUT VALIDATION AND PROCESSING MODE DETERMINATION
+# =====================================================================================
 # Check if the user entered something or clicked Cancel
 if user_input is not None:
     if user_input.lower()[:1] == "l": # if user puts in "left", "LeFT" or "l" will be  a positive catch
@@ -63,6 +90,11 @@ else:
     print("END: User cancelled the input or entered no input.")
     sys.exit() # exit function to stop the run
 
+
+# =====================================================================================
+# CORE PDF CONVERSION FUNCTION
+# =====================================================================================
+
 def a3_to_two_a4(input_pdf_path, output_pdf_path):
     """
     Converts an A3 PDF page into two A4 pages (left and right halves).
@@ -71,6 +103,10 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
         input_pdf_path (str): Path to the input A3 PDF file.
         output_pdf_path (str): Path to save the output PDF file with A4 pages.
     """
+    
+    # =============================================================================
+    # PDF READER/WRITER INITIALIZATION
+    # =============================================================================
     os.chdir(src_docs_path) # change to the directory with the source files
     doc = PdfReader(input_pdf_path)
     writer = PdfWriter()
@@ -78,6 +114,10 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
     a4_width = PaperSize.A4.width
     a4_height = PaperSize.A4.height
 
+    
+    # =============================================================================
+    # PAGE PROCESSING LOOP - ITERATE THROUGH EACH PAGE
+    # =============================================================================
     for page_num, page in enumerate(doc.pages):
         # Ensure the page is A3 landscape (approximate check)
         # A3 landscape dimensions: ~1191 x 842 points (72 dpi)
@@ -88,7 +128,15 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
         page_width = float(page.mediabox.height)
         page_height = float(page.mediabox.width)
 
+        
+        # =============================================================================
+        # ROTATION CASE 1: STANDARD ORIENTATION (0° or 180°)
+        # =============================================================================
         if rotated_angle in [0, 180]:
+            
+            # -------------------------------------------------------------------------
+            # RIGHT-FIRST PAGE ORDER PROCESSING
+            # -------------------------------------------------------------------------
             if str(user_input).lower() == "r":
                 while page_num >= 1:
                     # Create the first A4 page (left half of the A3)
@@ -103,6 +151,10 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
                     left_half.merge_page(page)
                     left_half.rotate(rotated_angle)
                     break
+                    
+            # -------------------------------------------------------------------------
+            # LEFT-FIRST PAGE ORDER PROCESSING (DEFAULT)
+            # -------------------------------------------------------------------------
             else:
                 # Create the first A4 page (left half of the A3)
                 left_half = writer.add_blank_page(width=a4_width, height=a4_height)
@@ -116,6 +168,9 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
                 left_half.merge_page(page)
                 left_half.rotate(rotated_angle)
 
+            # -------------------------------------------------------------------------
+            # RIGHT HALF PROCESSING (COMMON TO BOTH LEFT/RIGHT-FIRST MODES)
+            # -------------------------------------------------------------------------
             # Create the second A4 page (right half of the A3)
             right_half = writer.add_blank_page(width=a4_width, height=a4_height)
             # Set the crop box to the right half of the A3 page
@@ -128,7 +183,15 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
             right_half.merge_page(page)
             right_half.rotate(rotated_angle)
 
+            
+        # =============================================================================
+        # ROTATION CASE 2: ROTATED ORIENTATION (90° or 270°)
+        # =============================================================================
         else:
+            
+            # -------------------------------------------------------------------------
+            # RIGHT-FIRST PAGE ORDER FOR ROTATED PAGES
+            # -------------------------------------------------------------------------
             if str(user_input).lower() == "r":
                 while page_num >= 1:
                     # Create the first A4 page (left half of the A3)
@@ -143,6 +206,10 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
                     left_half.merge_page(page)
                     left_half.rotate(rotated_angle)
                     break
+                    
+            # -------------------------------------------------------------------------
+            # LEFT-FIRST PAGE ORDER FOR ROTATED PAGES (DEFAULT)
+            # -------------------------------------------------------------------------
             else:
                 # Create the first A4 page (left half of the A3)
                 left_half = writer.add_blank_page(width=a4_width, height=a4_height)
@@ -156,6 +223,9 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
                 left_half.merge_page(page)
                 left_half.rotate(rotated_angle)
 
+            # -------------------------------------------------------------------------
+            # RIGHT HALF PROCESSING FOR ROTATED PAGES
+            # -------------------------------------------------------------------------
             # Create the second A4 page (right half of the A3)
             right_half = writer.add_blank_page(width=a4_width, height=a4_height)
             # Set the crop box to the right half of the A3 page
@@ -168,6 +238,10 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
             right_half.merge_page(page)
             right_half.rotate(rotated_angle)
 
+    
+    # =============================================================================
+    # OUTPUT FILE CREATION AND SAVING
+    # =============================================================================
     if not os.path.exists(output_folder_name):
         os.mkdir(output_folder_name)
     os.chdir(output_folder_name)
@@ -175,10 +249,17 @@ def a3_to_two_a4(input_pdf_path, output_pdf_path):
         writer.write(output_stream)
     os.chdir(src_docs_path) # change back to the directory with the source files
 
+# =====================================================================================
+# MAIN EXECUTION BLOCK - BATCH PROCESSING SETUP
+# =====================================================================================
 # Usage:
 output_dir = os.path.join(src_docs_path, output_folder_name) # parse as path the output folder directory
 output_dir = Path(output_dir).as_posix() # force parse as path in the current OS
 
+
+# =====================================================================================
+# BATCH FILE PROCESSING LOOP
+# =====================================================================================
 # loops over all files in the list of A3 target source documents
 for file in list_of_files:
     src_scan_file = os.path.join(src_docs_path, file) # parse as path the source file
@@ -187,6 +268,11 @@ for file in list_of_files:
     print("PROCESS: processing a3 file", src_scan_file)
     a3_to_two_a4("{}".format(file), "{}".format(file))
     #print("END: done converting a3 file to a4:", outs)
+
+
+# =====================================================================================
+# COMPLETION STATUS AND USER FEEDBACK
+# =====================================================================================
 print("-----------------------------------------------------")
 print("DONE: finished processing scans - check {} for outputs".format(output_dir))
 print("END: now opening output folder {} in windows file explorer".format(output_dir))
